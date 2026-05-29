@@ -32,6 +32,7 @@ export default function CoursePage() {
   const [scheduleEnd, setScheduleEnd] = useState('')
   const [scheduleLocation, setScheduleLocation] = useState('')
   const [saving, setSaving] = useState(false)
+  const [scheduleError, setScheduleError] = useState('')
 
   const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
 
@@ -131,11 +132,39 @@ export default function CoursePage() {
   const addSchedule = async (e) => {
     e.preventDefault()
     setSaving(true)
+    setScheduleError('')
+
+    // Fetch all schedule entries across all courses in this department
+    const { data: deptCourses } = await supabase
+      .from('courses')
+      .select('id')
+      .eq('department_id', course.department_id)
+
+    const allCourseIds = deptCourses?.map(c => c.id) || []
+
+    const { data: allEntries } = await supabase
+      .from('schedule')
+      .select('*, courses(title, code)')
+      .in('course_id', allCourseIds)
+      .eq('day', scheduleDay)
+
+    // Check for time overlaps: clash if newStart < existingEnd AND newEnd > existingStart
+    const clash = allEntries?.find(s => {
+      return scheduleStart < s.end_time && scheduleEnd > s.start_time
+    })
+
+    if (clash) {
+      setScheduleError(`This clashes with ${clash.courses?.code} (${clash.start_time} – ${clash.end_time}) on ${scheduleDay}.`)
+      setSaving(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('schedule')
       .insert({ course_id: id, day: scheduleDay, start_time: scheduleStart, end_time: scheduleEnd, location: scheduleLocation })
       .select()
       .single()
+
     if (!error) {
       setSchedule([...schedule, data])
       setScheduleDay('Monday')
@@ -145,6 +174,12 @@ export default function CoursePage() {
       setShowScheduleForm(false)
     }
     setSaving(false)
+  }
+
+  const deleteSchedule = async (entry) => {
+    if (!confirm(`Delete this class (${entry.day} ${entry.start_time} – ${entry.end_time})?`)) return
+    await supabase.from('schedule').delete().eq('id', entry.id)
+    setSchedule(schedule.filter(s => s.id !== entry.id))
   }
 
   const isLecturer = profile?.role === 'lecturer'
@@ -282,7 +317,7 @@ export default function CoursePage() {
                     <label className="flex items-center gap-3 w-full border border-gray-300 rounded-lg px-3 py-2 cursor-pointer hover:border-blue-400 transition-colors">
                       <span className="text-sm text-white bg-gray-400 px-3 py-1 rounded-md whitespace-nowrap">Choose file</span>
                       <span className="text-sm text-gray-500 truncate">{materialFile ? materialFile.name : 'No file chosen'}</span>
-                      <input key={showMaterialForm} type="file" onChange={(e) => setMaterialFile(e.target.files[0])} accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt, .zip" className="hidden" required />
+                      <input key={showMaterialForm} type="file" onChange={(e) => setMaterialFile(e.target.files[0])} accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip" className="hidden" required />
                     </label>
                   </div>
                 ) : (
@@ -315,9 +350,7 @@ export default function CoursePage() {
                       <p className="text-xs text-gray-400 mt-1">{new Date(m.uploaded_at).toLocaleDateString('en-KE', { dateStyle: 'medium' })}</p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline font-medium">
-                        Open 
-                      </a>
+                      <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline font-medium">Open →</a>
                       {isLecturer && (
                         <button onClick={() => deleteMaterial(m)} className="text-sm text-red-400 hover:text-red-600 transition-colors">
                           Delete
@@ -337,7 +370,7 @@ export default function CoursePage() {
               <h3 className="text-lg font-medium text-gray-900">Schedule</h3>
               {isLecturer && (
                 <button
-                  onClick={() => setShowScheduleForm(!showScheduleForm)}
+                  onClick={() => { setShowScheduleForm(!showScheduleForm); setScheduleError('') }}
                   className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   + Add class
@@ -369,11 +402,12 @@ export default function CoursePage() {
                     <input type="time" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} className={inputClass} required />
                   </div>
                 </div>
+                {scheduleError && <p className="text-red-500 text-sm">{scheduleError}</p>}
                 <div className="flex gap-3">
                   <button type="submit" disabled={saving} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium">
-                    {saving ? 'Saving...' : 'Save'}
+                    {saving ? 'Checking...' : 'Save'}
                   </button>
-                  <button type="button" onClick={() => setShowScheduleForm(false)} className="text-sm text-gray-500 hover:text-gray-900 px-4 py-2">
+                  <button type="button" onClick={() => { setShowScheduleForm(false); setScheduleError('') }} className="text-sm text-gray-500 hover:text-gray-900 px-4 py-2">
                     Cancel
                   </button>
                 </div>
@@ -392,9 +426,16 @@ export default function CoursePage() {
                       <p className="text-sm font-medium text-gray-900">{s.day}</p>
                       <p className="text-xs text-gray-500 mt-1">{s.start_time} – {s.end_time}</p>
                     </div>
-                    {s.location && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{s.location}</span>
-                    )}
+                    <div className="flex items-center gap-4">
+                      {s.location && (
+                        <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{s.location}</span>
+                      )}
+                      {isLecturer && (
+                        <button onClick={() => deleteSchedule(s)} className="text-sm text-red-400 hover:text-red-600 transition-colors">
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

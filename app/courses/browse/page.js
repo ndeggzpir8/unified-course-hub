@@ -8,8 +8,10 @@ import Link from 'next/link'
 export default function BrowseCoursesPage() {
   const [courses, setCourses] = useState([])
   const [enrolledIds, setEnrolledIds] = useState([])
+  const [department, setDepartment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState(null)
+  const [unenrolling, setUnenrolling] = useState(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -17,9 +19,28 @@ export default function BrowseCoursesPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('department_id, departments(name, code)')
+        .eq('id', session.user.id)
+        .single()
+
+      setDepartment(profile?.departments || null)
+
+      if (!profile?.department_id) {
+        setLoading(false)
+        return
+      }
+
       const [{ data: coursesData }, { data: enrollmentsData }] = await Promise.all([
-        supabase.from('courses').select('*'),
-        supabase.from('enrollments').select('course_id').eq('student_id', session.user.id)
+        supabase
+          .from('courses')
+          .select('*')
+          .eq('department_id', profile.department_id),
+        supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('student_id', session.user.id)
       ])
 
       setCourses(coursesData || [])
@@ -32,15 +53,24 @@ export default function BrowseCoursesPage() {
   const handleEnroll = async (courseId) => {
     setEnrolling(courseId)
     const { data: { session } } = await supabase.auth.getSession()
-
     const { error } = await supabase
       .from('enrollments')
       .insert({ student_id: session.user.id, course_id: courseId })
-
-    if (!error) {
-      setEnrolledIds([...enrolledIds, courseId])
-    }
+    if (!error) setEnrolledIds([...enrolledIds, courseId])
     setEnrolling(null)
+  }
+
+  const handleUnenroll = async (courseId) => {
+    if (!confirm('Unenroll from this course? You can re-enroll at any time.')) return
+    setUnenrolling(courseId)
+    const { data: { session } } = await supabase.auth.getSession()
+    const { error } = await supabase
+      .from('enrollments')
+      .delete()
+      .eq('student_id', session.user.id)
+      .eq('course_id', courseId)
+    if (!error) setEnrolledIds(enrolledIds.filter(id => id !== courseId))
+    setUnenrolling(null)
   }
 
   if (loading) return (
@@ -63,12 +93,21 @@ export default function BrowseCoursesPage() {
       <main className="max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Browse courses</h2>
-          <p className="text-sm text-gray-500 mt-1">Enroll in a course to access its materials and announcements</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {department
+              ? `Showing courses in ${department.name} (${department.code})`
+              : 'No department assigned to your account'}
+          </p>
         </div>
 
-        {courses.length === 0 ? (
+        {!department ? (
           <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <p className="text-gray-500 text-sm">No courses available yet.</p>
+            <p className="text-gray-500 text-sm">Your account has no department assigned.</p>
+            <p className="text-gray-400 text-xs mt-2">Please contact your administrator.</p>
+          </div>
+        ) : courses.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+            <p className="text-gray-500 text-sm">No courses available in {department.name} yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -83,12 +122,18 @@ export default function BrowseCoursesPage() {
                     <h3 className="text-gray-900 font-medium mt-3">{course.title}</h3>
                   </div>
                   {enrolled ? (
-                    <Link
-                      href={`/courses/${course.id}`}
-                      className="text-center text-sm text-green-600 bg-green-50 border border-green-200 px-4 py-2 rounded-lg font-medium hover:bg-green-100 transition-colors"
-                    >
-                      ✓ Enrolled — View course
-                    </Link>
+                    <div className="flex flex-col gap-2">
+                      <Link href={`/courses/${course.id}`} className="text-center text-sm text-green-600 bg-green-50 border border-green-200 px-4 py-2 rounded-lg font-medium hover:bg-green-100 transition-colors">
+                        ✓ Enrolled — View course
+                      </Link>
+                      <button
+                        onClick={() => handleUnenroll(course.id)}
+                        disabled={unenrolling === course.id}
+                        className="text-sm text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      >
+                        {unenrolling === course.id ? 'Unenrolling...' : 'Unenroll'}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={() => handleEnroll(course.id)}

@@ -19,9 +19,15 @@ export default function NewCoursePage() {
 
     const { data: { session } } = await supabase.auth.getSession()
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('department_id')
+      .eq('id', session.user.id)
+      .single()
+
     const { error } = await supabase
       .from('courses')
-      .insert({ title, code, lecturer_id: session.user.id })
+      .insert({ title, code, lecturer_id: session.user.id, department_id: profile.department_id })
 
     if (error) {
       setError(error.message)
@@ -45,7 +51,7 @@ export default function NewCoursePage() {
 
       <main className="max-w-xl mx-auto px-6 py-12">
         <h2 className="text-xl font-semibold text-gray-900 mb-1">Create a new course</h2>
-        <p className="text-sm text-gray-500 mb-8">Students will be able to enroll and access materials here</p>
+        <p className="text-sm text-gray-500 mb-8">Students in your department will be able to enroll and access materials here</p>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-8">
           <form onSubmit={handleCreate} className="space-y-5">
