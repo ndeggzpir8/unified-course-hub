@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [courses, setCourses] = useState([])
   const [upcomingClasses, setUpcomingClasses] = useState([])
   const [recentAnnouncements, setRecentAnnouncements] = useState([])
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -79,7 +80,7 @@ export default function DashboardPage() {
       setCourses(coursesData)
 
       if (courseIds.length > 0) {
-        const [{ data: scheduleData }, { data: announcementsData }] = await Promise.all([
+        const [{ data: scheduleData }, { data: announcementsData }, { data: assignmentsData }] = await Promise.all([
           supabase
             .from('schedule')
             .select('*, courses(title, code)')
@@ -89,11 +90,19 @@ export default function DashboardPage() {
             .select('*, courses(title, code)')
             .in('course_id', courseIds)
             .order('created_at', { ascending: false })
+            .limit(5),
+          supabase
+            .from('assignments')
+            .select('*, courses(title, code)')
+            .in('course_id', courseIds)
+            .gte('due_date', new Date().toISOString())
+            .order('due_date', { ascending: true })
             .limit(5)
         ])
 
         setUpcomingClasses(getUpcomingClasses(scheduleData || []))
         setRecentAnnouncements(announcementsData || [])
+        setUpcomingDeadlines(assignmentsData || [])
       }
 
       setLoading(false)
@@ -167,7 +176,7 @@ export default function DashboardPage() {
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
             <p className="text-xs text-gray-500 mb-1">{profile?.role === 'lecturer' ? 'Courses teaching' : 'Courses enrolled'}</p>
             <p className="text-2xl font-semibold text-gray-900">{courses.length}</p>
@@ -178,6 +187,10 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-400 mt-1">{today}</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500 mb-1">Upcoming deadlines</p>
+            <p className="text-2xl font-semibold text-gray-900">{upcomingDeadlines.length}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
             <p className="text-xs text-gray-500 mb-1">Recent announcements</p>
             <p className="text-2xl font-semibold text-gray-900">{recentAnnouncements.length}</p>
           </div>
@@ -185,35 +198,65 @@ export default function DashboardPage() {
 
         {/* Upcoming classes + Recent announcements */}
         {courses.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
             {/* Upcoming classes */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-700">Upcoming classes</h3>
-                <Link href="/schedule" className="text-xs text-blue-600 hover:underline">View full schedule</Link>
+                <Link href="/schedule" className="text-xs text-blue-600 hover:underline">View schedule</Link>
               </div>
               <div className="space-y-3">
                 {upcomingClasses.length === 0 ? (
                   <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
-                    <p className="text-sm text-gray-400">No upcoming classes this week</p>
+                    <p className="text-sm text-gray-400">No upcoming classes</p>
                   </div>
                 ) : (
                   upcomingClasses.map(s => (
-                    <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{s.courses?.code}</span>
-                          {s.day === today && <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Today</span>}
-                        </div>
-                        <p className="text-sm font-medium text-gray-900">{s.courses?.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{s.day} · {s.start_time} – {s.end_time}</p>
+                    <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{s.courses?.code}</span>
+                        {s.day === today && <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Today</span>}
                       </div>
-                      {s.location && (
-                        <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full shrink-0">{s.location}</span>
-                      )}
+                      <p className="text-sm font-medium text-gray-900">{s.courses?.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{s.day} · {s.start_time} – {s.end_time}</p>
+                      {s.location && <p className="text-xs text-gray-400 mt-0.5">{s.location}</p>}
                     </div>
                   ))
+                )}
+              </div>
+            </div>
+
+            {/* Upcoming deadlines */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Upcoming deadlines</h3>
+              <div className="space-y-3">
+                {upcomingDeadlines.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
+                    <p className="text-sm text-gray-400">No upcoming deadlines</p>
+                  </div>
+                ) : (
+                  upcomingDeadlines.map(a => {
+                    const due = new Date(a.due_date)
+                    const diffDays = Math.ceil((due - new Date()) / (1000 * 60 * 60 * 24))
+                    const isUrgent = diffDays <= 3
+                    return (
+                      <Link key={a.id} href={`/courses/${a.course_id}?tab=assignments`}>
+                        <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.type === 'cat' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {a.type === 'cat' ? 'CAT' : 'Assignment'}
+                            </span>
+                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{a.courses?.code}</span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                          <p className={`text-xs mt-0.5 ${isUrgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                            Due {due.toLocaleDateString('en-KE', { dateStyle: 'medium' })} · {due.toLocaleTimeString('en-KE', { timeStyle: 'short' })}
+                          </p>
+                        </div>
+                      </Link>
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -242,6 +285,7 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+
           </div>
         )}
 

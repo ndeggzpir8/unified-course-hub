@@ -29,14 +29,35 @@ const formatHour = (hour) => {
   return `${h}${hour < 12 ? 'am' : 'pm'}`
 }
 
+const getDayName = (dateStr) => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  return days[new Date(dateStr).getDay()]
+}
+
+const getWeekDates = () => {
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+  return DAYS.map((_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    return d
+  })
+}
+
 export default function SchedulePage() {
   const [schedule, setSchedule] = useState([])
+  const [assignments, setAssignments] = useState([])
   const [courseColorMap, setCourseColorMap] = useState({})
   const [loading, setLoading] = useState(true)
+  const [showClasses, setShowClasses] = useState(true)
+  const [showAssignments, setShowAssignments] = useState(true)
   const router = useRouter()
 
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
   const totalHeight = hours.length * HOUR_HEIGHT
+  const weekDates = getWeekDates()
 
   useEffect(() => {
     const init = async () => {
@@ -50,13 +71,24 @@ export default function SchedulePage() {
         .single()
 
       let scheduleData = []
+      let assignmentsData = []
 
       if (profileData.role === 'lecturer') {
-        const { data } = await supabase
-          .from('schedule')
-          .select('*, courses(title, code)')
-          .order('start_time')
-        scheduleData = data || []
+        const { data: lecturerCourses } = await supabase
+          .from('courses')
+          .select('id')
+          .eq('lecturer_id', session.user.id)
+
+        const courseIds = lecturerCourses?.map(c => c.id) || []
+
+        if (courseIds.length > 0) {
+          const [{ data: sched }, { data: assign }] = await Promise.all([
+            supabase.from('schedule').select('*, courses(title, code)').in('course_id', courseIds).order('start_time'),
+            supabase.from('assignments').select('*, courses(title, code)').in('course_id', courseIds).order('due_date')
+          ])
+          scheduleData = sched || []
+          assignmentsData = assign || []
+        }
       } else {
         const { data: enrollments } = await supabase
           .from('enrollments')
@@ -66,12 +98,12 @@ export default function SchedulePage() {
         const courseIds = enrollments?.map(e => e.course_id) || []
 
         if (courseIds.length > 0) {
-          const { data } = await supabase
-            .from('schedule')
-            .select('*, courses(title, code)')
-            .in('course_id', courseIds)
-            .order('start_time')
-          scheduleData = data || []
+          const [{ data: sched }, { data: assign }] = await Promise.all([
+            supabase.from('schedule').select('*, courses(title, code)').in('course_id', courseIds).order('start_time'),
+            supabase.from('assignments').select('*, courses(title, code)').in('course_id', courseIds).order('due_date')
+          ])
+          scheduleData = sched || []
+          assignmentsData = assign || []
         }
       }
 
@@ -83,8 +115,15 @@ export default function SchedulePage() {
           colorIndex++
         }
       })
+      assignmentsData.forEach(a => {
+        if (!colorMap[a.course_id]) {
+          colorMap[a.course_id] = COLORS[colorIndex % COLORS.length]
+          colorIndex++
+        }
+      })
 
       setSchedule(scheduleData)
+      setAssignments(assignmentsData)
       setCourseColorMap(colorMap)
       setLoading(false)
     }
@@ -92,6 +131,26 @@ export default function SchedulePage() {
   }, [])
 
   const getScheduleForDay = (day) => schedule.filter(s => s.day === day)
+
+  const getAssignmentsForDay = (dayIndex) => {
+    const date = weekDates[dayIndex]
+    return assignments.filter(a => {
+      const aDate = new Date(a.due_date)
+      return (
+        aDate.getFullYear() === date.getFullYear() &&
+        aDate.getMonth() === date.getMonth() &&
+        aDate.getDate() === date.getDate()
+      )
+    })
+  }
+
+  const today = new Date()
+  const isToday = (dayIndex) => {
+    const d = weekDates[dayIndex]
+    return d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate()
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -122,9 +181,25 @@ export default function SchedulePage() {
       </nav>
 
       <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Weekly Schedule</h2>
-          <p className="text-sm text-gray-500 mt-1">All your classes across all courses</p>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Weekly Schedule</h2>
+            <p className="text-sm text-gray-500 mt-1">All your classes and deadlines this week</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowClasses(!showClasses)}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${showClasses ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-300'}`}
+            >
+              Classes
+            </button>
+            <button
+              onClick={() => setShowAssignments(!showAssignments)}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${showAssignments ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-500 border-gray-300'}`}
+            >
+              Deadlines
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -134,47 +209,56 @@ export default function SchedulePage() {
               {/* Day headers */}
               <div className="flex border-b border-gray-200">
                 <div className="w-16 flex-shrink-0" />
-                {DAYS.map(day => (
-                  <div key={day} className="flex-1 text-center py-3 text-sm font-medium text-gray-700 border-l border-gray-100">
-                    {day}
+                {DAYS.map((day, i) => (
+                  <div key={day} className={`flex-1 text-center py-3 border-l border-gray-100 ${isToday(i) ? 'bg-blue-50' : ''}`}>
+                    <p className={`text-sm font-medium ${isToday(i) ? 'text-blue-600' : 'text-gray-700'}`}>{day}</p>
+                    <p className={`text-xs mt-0.5 ${isToday(i) ? 'text-blue-400' : 'text-gray-400'}`}>
+                      {weekDates[i].toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}
+                    </p>
                   </div>
                 ))}
               </div>
 
+              {/* Deadline banner row */}
+              {showAssignments && (
+                <div className="flex border-b border-gray-200 bg-gray-50">
+                  <div className="w-16 flex-shrink-0 flex items-center justify-end pr-2">
+                    <span className="text-xs text-gray-400">due</span>
+                  </div>
+                  {DAYS.map((day, i) => {
+                    const dayAssignments = getAssignmentsForDay(i)
+                    return (
+                      <div key={day} className={`flex-1 border-l border-gray-100 p-1 min-h-8 ${isToday(i) ? 'bg-blue-50' : ''}`}>
+                        {dayAssignments.map(a => (
+                          <Link key={a.id} href={`/courses/${a.course_id}?tab=assignments`}>
+                            <div className={`text-xs px-2 py-1 rounded-md mb-1 truncate cursor-pointer hover:opacity-80 ${a.type === 'cat' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                              <span className="font-medium">{a.type === 'cat' ? 'CAT' : 'Asgn'}</span> · {a.courses?.code} · {a.title}
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* Calendar grid */}
               <div className="flex">
-
-                {/* Time labels */}
                 <div className="w-16 flex-shrink-0">
                   {hours.map(hour => (
-                    <div
-                      key={hour}
-                      style={{ height: HOUR_HEIGHT }}
-                      className="flex items-start justify-end pr-2 pt-1"
-                    >
+                    <div key={hour} style={{ height: HOUR_HEIGHT }} className="flex items-start justify-end pr-2 pt-1">
                       <span className="text-xs text-gray-400">{formatHour(hour)}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* Day columns */}
-                {DAYS.map(day => (
-                  <div
-                    key={day}
-                    className="flex-1 relative border-l border-gray-100"
-                    style={{ height: totalHeight }}
-                  >
-                    {/* Hour grid lines */}
+                {DAYS.map((day, i) => (
+                  <div key={day} className={`flex-1 relative border-l border-gray-100 ${isToday(i) ? 'bg-blue-50' : ''}`} style={{ height: totalHeight }}>
                     {hours.map(hour => (
-                      <div
-                        key={hour}
-                        className="absolute w-full border-t border-gray-100"
-                        style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
-                      />
+                      <div key={hour} className="absolute w-full border-t border-gray-100" style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }} />
                     ))}
 
-                    {/* Course blocks */}
-                    {getScheduleForDay(day).map(s => {
+                    {showClasses && getScheduleForDay(day).map(s => {
                       const top = (timeToHours(s.start_time) - START_HOUR) * HOUR_HEIGHT
                       const height = (timeToHours(s.end_time) - timeToHours(s.start_time)) * HOUR_HEIGHT
                       const color = courseColorMap[s.course_id] || COLORS[0]
@@ -186,15 +270,14 @@ export default function SchedulePage() {
                         >
                           <p className="text-xs font-semibold truncate">{s.courses?.code}</p>
                           <p className="text-xs truncate opacity-80">{s.courses?.title}</p>
-                          {s.location && (
-                            <p className="text-xs truncate opacity-60 mt-0.5">{s.location}</p>
-                          )}
+                          {s.location && <p className="text-xs truncate opacity-60 mt-0.5">{s.location}</p>}
                         </div>
                       )
                     })}
                   </div>
                 ))}
               </div>
+
             </div>
           </div>
         </div>
