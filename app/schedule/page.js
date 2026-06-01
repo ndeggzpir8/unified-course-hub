@@ -230,7 +230,7 @@ export default function SchedulePage() {
                     return (
                       <div key={day} className={`flex-1 border-l border-gray-100 p-1 min-h-8 ${isToday(i) ? 'bg-blue-50' : ''}`}>
                         {dayAssignments.map(a => (
-                          <Link key={a.id} href={`/courses/${a.course_id}?tab=assignments`}>
+                          <Link key={a.id} href={`/courses/${a.course_id}?tab=${a.type === 'cat' ? 'schedule' : 'assignments'}`}>
                             <div className={`text-xs px-2 py-1 rounded-md mb-1 truncate cursor-pointer hover:opacity-80 ${a.type === 'cat' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
                               <span className="font-medium">{a.type === 'cat' ? 'CAT' : 'Asgn'}</span> · {a.courses?.code} · {a.title}
                             </div>

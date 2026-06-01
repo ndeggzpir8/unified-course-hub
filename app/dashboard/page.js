@@ -241,7 +241,7 @@ export default function DashboardPage() {
                     const diffDays = Math.ceil((due - new Date()) / (1000 * 60 * 60 * 24))
                     const isUrgent = diffDays <= 3
                     return (
-                      <Link key={a.id} href={`/courses/${a.course_id}?tab=assignments`}>
+                      <Link key={a.id} href={`/courses/${a.course_id}?tab=${a.type === 'cat' ? 'schedule' : 'assignments'}`}>
                         <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.type === 'cat' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
