@@ -138,9 +138,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 border-t-2 border-t-amber-400 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Course Hub</h1>
+          <Link href="/" className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">Course Hub</Link>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-600">Hi, {profile?.full_name}</span>
@@ -293,7 +293,7 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>
                 {profile?.role === 'lecturer' ? 'My Courses' : 'Enrolled Courses'}
               </h2>
               <p className="text-sm text-gray-500 mt-1">

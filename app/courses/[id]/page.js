@@ -358,9 +358,9 @@ export default function CoursePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 border-t-2 border-t-amber-400 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Course Hub</h1>
+          <Link href="/" className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">Course Hub</Link>
           <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
             ← Back to dashboard
           </Link>
@@ -372,7 +372,7 @@ export default function CoursePage() {
           <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
             {course?.code}
           </span>
-          <h2 className="text-2xl font-semibold text-gray-900 mt-3">{course?.title}</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mt-3" style={{ fontFamily: 'var(--font-display)' }}>{course?.title}</h2>
         </div>
       </div>
 

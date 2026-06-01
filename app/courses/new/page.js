@@ -40,9 +40,9 @@ export default function NewCoursePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 border-t-2 border-t-amber-400 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Course Hub</h1>
+          <Link href="/" className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">Course Hub</Link>
           <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
             ← Back to dashboard
           </Link>
