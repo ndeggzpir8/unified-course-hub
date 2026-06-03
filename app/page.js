@@ -83,7 +83,7 @@ export default function HomePage() {
                     </h1>
 
                     <p className="text-lg max-w-2xl mb-10 leading-relaxed" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                        Course materials, announcements, schedules, and assignments — consolidated into one platform. No more switching between WhatsApp, Moodle, and Google Drive.
+                        Course materials, announcements, schedules, and assignments — consolidated into one platform. No more switching between WhatsApp, Moodle, Google Drive, etc.
                     </p>
 
                     <div className="flex items-center gap-4 flex-wrap justify-center">

@@ -143,7 +143,7 @@ export default function DashboardPage() {
           <Link href="/" className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">Course Hub</Link>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">Hi, {profile?.full_name}</span>
+              <Link href="/settings" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">{profile?.full_name}</Link>
               {profile?.departments?.name && (
                 <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
                   {profile.departments.name}
