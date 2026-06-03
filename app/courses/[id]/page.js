@@ -521,8 +521,8 @@ export default function CoursePage() {
                   return (
                     <div key={a.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                       <div className="p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Assignment</span>
                               <span className={`text-xs font-medium ${due.overdue ? 'text-red-500' : due.urgent ? 'text-orange-500' : 'text-gray-400'}`}>
@@ -535,7 +535,7 @@ export default function CoursePage() {
                               <a href={a.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-2">📎 View attachment</a>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-3 sm:shrink-0 flex-wrap">
                             {isLecturer ? (
                               <>
                                 <button onClick={() => loadSubmissionsForAssignment(a.id)} className="text-sm text-blue-600 hover:underline font-medium">

@@ -22,18 +22,19 @@ const getUpcomingClasses = (schedule) => {
   const now = getCurrentTime()
   const todayIndex = DAY_ORDER.indexOf(today)
 
-  // Classes later today, then rest of week, then wrap to start of week
-  const ranked = schedule
+  const upcoming = schedule
     .map(s => {
       const dayIndex = DAY_ORDER.indexOf(s.day)
-      if (dayIndex === -1) return { ...s, rank: 999 } // weekend fallback
+      if (dayIndex === -1) return null
+      if (dayIndex < todayIndex) return null
+      if (dayIndex === todayIndex && s.start_time <= now) return null
       if (dayIndex === todayIndex && s.start_time > now) return { ...s, rank: 0 }
-      if (dayIndex > todayIndex) return { ...s, rank: dayIndex - todayIndex }
-      return { ...s, rank: dayIndex + 5 - todayIndex } // wraps to next week
+      return { ...s, rank: dayIndex - todayIndex }
     })
+    .filter(Boolean)
     .sort((a, b) => a.rank - b.rank || a.start_time.localeCompare(b.start_time))
 
-  return ranked.slice(0, 3)
+  return upcoming.slice(0, 3)
 }
 
 export default function DashboardPage() {
@@ -145,7 +146,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <Link href="/settings" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">{profile?.full_name}</Link>
               {profile?.departments?.name && (
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                <span className="inline-flex items-center text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full whitespace-nowrap">
                   {profile.departments.name}
                 </span>
               )}
@@ -176,27 +177,27 @@ export default function DashboardPage() {
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
 
         {/* Stats row */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
             <p className="text-xs text-gray-500 mb-1">{profile?.role === 'lecturer' ? 'Courses teaching' : 'Courses enrolled'}</p>
             <p className="text-2xl font-semibold text-gray-900">{courses.length}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
             <p className="text-xs text-gray-500 mb-1">Classes today</p>
             <p className="text-2xl font-semibold text-gray-900">{classesToday}</p>
             <p className="text-xs text-gray-400 mt-1">{today}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
             <p className="text-xs text-gray-500 mb-1">Upcoming deadlines</p>
             <p className="text-2xl font-semibold text-gray-900">{upcomingDeadlines.length}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
             <p className="text-xs text-gray-500 mb-1">Recent announcements</p>
             <p className="text-2xl font-semibold text-gray-900">{recentAnnouncements.length}</p>
           </div>
         </div>
 
-        {/* Upcoming classes + Recent announcements */}
+        {/* Upcoming classes + Deadlines + Recent announcements */}
         {courses.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
@@ -214,13 +215,13 @@ export default function DashboardPage() {
                 ) : (
                   upcomingClasses.map(s => (
                     <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{s.courses?.code}</span>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">{s.courses?.code}</span>
                         {s.day === today && <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Today</span>}
                       </div>
-                      <p className="text-sm font-medium text-gray-900">{s.courses?.title}</p>
+                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{s.courses?.title}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{s.day} · {s.start_time} – {s.end_time}</p>
-                      {s.location && <p className="text-xs text-gray-400 mt-0.5">{s.location}</p>}
+                      {s.location && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{s.location}</p>}
                     </div>
                   ))
                 )}
@@ -243,13 +244,13 @@ export default function DashboardPage() {
                     return (
                       <Link key={a.id} href={`/courses/${a.course_id}?tab=${a.type === 'cat' ? 'schedule' : 'assignments'}`}>
                         <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors cursor-pointer">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.type === 'cat' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${a.type === 'cat' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
                               {a.type === 'cat' ? 'CAT' : 'Assignment'}
                             </span>
-                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{a.courses?.code}</span>
+                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">{a.courses?.code}</span>
                           </div>
-                          <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                          <p className="text-sm font-medium text-gray-900 line-clamp-1">{a.title}</p>
                           <p className={`text-xs mt-0.5 ${isUrgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
                             Due {due.toLocaleDateString('en-KE', { dateStyle: 'medium' })} · {due.toLocaleTimeString('en-KE', { timeStyle: 'short' })}
                           </p>
@@ -273,12 +274,12 @@ export default function DashboardPage() {
                   recentAnnouncements.map(a => (
                     <Link key={a.id} href={`/courses/${a.course_id}`}>
                       <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors cursor-pointer">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{a.courses?.code}</span>
-                          <span className="text-xs text-gray-400">{new Date(a.created_at).toLocaleDateString('en-KE', { dateStyle: 'medium' })}</span>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">{a.courses?.code}</span>
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{new Date(a.created_at).toLocaleDateString('en-KE', { dateStyle: 'medium' })}</span>
                         </div>
-                        <p className="text-sm font-medium text-gray-900">{a.title}</p>
-                        {a.body && <p className="text-xs text-gray-500 mt-0.5 truncate">{a.body}</p>}
+                        <p className="text-sm font-medium text-gray-900 line-clamp-1">{a.title}</p>
+                        {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{a.body}</p>}
                       </div>
                     </Link>
                   ))
